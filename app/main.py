@@ -1,28 +1,31 @@
 # app/main.py
 from fastapi import FastAPI
 from pydantic import BaseModel
+from typing import List, Optional
+from .scrape_directory import scrape_directory  # make sure this exists
 
-app = FastAPI(title="n8n Partner Scraper")  # <- must be named `app`
+app = FastAPI(title="n8n Partner Scraper")
 
 class ScrapeRequest(BaseModel):
-    url: str
-
-class PartnerRequest(BaseModel):
-    domain: str
+    # accept either a single URL or a list of URLs
+    url: Optional[str] = None
+    urls: Optional[List[str]] = None
 
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
 
 @app.post("/scrape-directory")
-def scrape_directory(payload: ScrapeRequest):
-    return {"message": f"Pretending to scrape directory at {payload.url}"}
+def scrape_directory_endpoint(payload: ScrapeRequest):
+    # normalize to a list
+    urls: List[str] = []
+    if payload.urls:
+        urls.extend(payload.urls)
+    if payload.url:
+        urls.append(payload.url)
 
-@app.post("/scrape-partner")
-def scrape_partner(payload: PartnerRequest):
-    return {
-        "domain": payload.domain,
-        "tier": "SMB",
-        "score_total": 42,
-        "notes": "Placeholder response"
-    }
+    if not urls:
+        return {"count": 0, "domains": [], "note": "Provide url or urls"}
+
+    domains = scrape_directory(urls)
+    return {"count": len(domains), "domains": domains}
