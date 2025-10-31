@@ -1,25 +1,26 @@
-# Use an official lightweight Python image
+# Dockerfile
 FROM python:3.11-slim
 
-# Set the working directory inside the container
 WORKDIR /app
 
-# Copy dependency list first (for caching)
-COPY requirements.txt .
+# Faster apt + basic deps for Playwright
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates fonts-liberation libnss3 libdbus-1-3 \
+    libatk1.0-0 libatk-bridge2.0-0 libdrm2 libxkbcommon0 libxcomposite1 \
+    libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of your app code
+# Install Chromium for Playwright inside the image
+RUN python -m playwright install --with-deps chromium
+
 COPY . .
 
-# Environment variable for Railway
 ENV PORT=8000
-
-# Expose port (for clarity; not strictly required by Railway)
 EXPOSE 8000
 
-# Start FastAPI using the PORT env var that Railway provides
-# The ${PORT:-8000} ensures it defaults to 8000 locally if PORT isn't set
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+
 
