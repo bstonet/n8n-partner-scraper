@@ -11,7 +11,7 @@ class ScrapeRequest(BaseModel):
     url: Optional[str] = None
     urls: Optional[List[str]] = None
     use_js: bool = False
-    wait_ms: int = 1800
+    wait_ms: int = 2000
 
 @app.get("/healthz")
 def healthz():
