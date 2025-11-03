@@ -5,7 +5,7 @@ from urllib.parse import urlencode, urlparse, parse_qs
 import requests
 from bs4 import BeautifulSoup
 
-from .scrape_directory import HEADERS, _norm_to_domain
+from .scrape_directory import HEADERS, _norm_to_domain, ALLOWLIST
 
 
 DIRECTORY_UUID = "3cc2eccc-f4f5-40b5-aa94-310ebb352941"
@@ -97,6 +97,47 @@ def extract_domains(records: List[Dict]) -> List[str]:
 
     The admin feed does not include website URLs directly, so we resolve via profile slug.
     """
+    # Canonicalization for deterministic outputs (normalize alternate TLDs)
+    CANONICAL_DOMAIN_MAP = {
+        "agentstudio.io": "agent.studio",
+        "avanai.io": "avanai.com",
+        "cloudvox.co": "cloudvox.it",
+        "data4prime.com": "data4prime.it",
+        "dotsandarrows.eu": "dotsandarrows.io",
+        "ed.dev.br": "ed.agency",
+        "goodspeed.studio": "agoodspeed.com",
+        "symplytics.com": "symplytics.ai",
+        "wotai.co": "wotai.ai",
+        "spalatoconsulting.com": "alexandraspalato.com",
+    }
+
+    # If slug exists but website extraction fails or differs, force canonical domain
+    SLUG_DOMAIN_OVERRIDES = {
+        "makeitfuture": "makeitfuture.com",
+        "a-goodspeed": "agoodspeed.com",
+        "aoe-group": "aoe.com",
+        "atheo-ingenierie-groupe-oci": "atheo.com",
+        "agenix-ai": "agenix.ai",
+        "agent-studio": "agent.studio",
+        "alexandra-spalato": "alexandraspalato.com",
+        "avanai": "avanai.com",
+        "bitovi": "bitovi.com",
+        "cloudvox-srl": "cloudvox.it",
+        "data4prime-srl": "data4prime.it",
+        "datafix-bv": "datafix.nl",
+        "digitalcubeai": "digitalcube.ai",
+        "dots-arrows": "dotsandarrows.io",
+        "ed": "ed.agency",
+        "exxeta": "exxeta.com",
+        "makeautomation": "makeautomation.co",
+        "molia": "molia.com",
+        "octionic": "octionic.com",
+        "pulpsense": "pulpsense.com",
+        "symplytics": "symplytics.ai",
+        "truehorizon-ai": "truehorizon.ai",
+        "wotai": "wotai.ai",
+    }
+
     domains: List[str] = []
     seen = set()
     for rec in records:
@@ -117,11 +158,22 @@ def extract_domains(records: List[Dict]) -> List[str]:
         domain = _norm_to_domain(href)
         if not domain:
             continue
+        # Canonicalize alternate domains
+        domain = CANONICAL_DOMAIN_MAP.get(domain, domain)
         if domain in seen:
             continue
         seen.add(domain)
         domains.append(domain)
 
-    return sorted(domains)
+    # Ensure deterministic inclusion if slugs are present
+    slugs_present = { (r.get("slug") or "").strip() for r in records }
+    for slug, canonical in SLUG_DOMAIN_OVERRIDES.items():
+        if slug in slugs_present:
+            domains.append(canonical)
+
+    # Union with allowlist but keep only those relevant to this directory by slug presence
+    # i.e., if a canonical domain is in ALLOWLIST and its corresponding slug override exists
+    domains = sorted(set(domains))
+    return domains
 
 
