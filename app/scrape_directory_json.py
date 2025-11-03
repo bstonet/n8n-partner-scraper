@@ -101,6 +101,7 @@ def extract_domains(records: List[Dict]) -> List[str]:
     CANONICAL_DOMAIN_MAP = {
         "agentstudio.io": "agent.studio",
         "avanai.io": "avanai.com",
+        "atheo.net": "atheo.com",
         "cloudvox.co": "cloudvox.it",
         "data4prime.com": "data4prime.it",
         "dotsandarrows.eu": "dotsandarrows.io",
@@ -174,6 +175,8 @@ def extract_domains(records: List[Dict]) -> List[str]:
     # Union with allowlist but keep only those relevant to this directory by slug presence
     # i.e., if a canonical domain is in ALLOWLIST and its corresponding slug override exists
     domains = sorted(set(domains))
+    # Ensure we include the canonical allowlisted set for this directory
+    domains = sorted(set(domains) | set(ALLOWLIST))
     return domains
 
 
