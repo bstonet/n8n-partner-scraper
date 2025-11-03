@@ -4,6 +4,8 @@ from typing import List, Optional
 from collections import Counter
 
 from .scrape_directory import scrape_directory
+from .scrape_directory_json import fetch_experts_json, extract_domains
+from .scrape_directory_crawl import crawl_directory
 from .render import render_html_sync, render_collect_hrefs_sync
 
 app = FastAPI(title="n8n Partner Scraper")
@@ -20,7 +22,14 @@ def healthz():
 
 @app.get("/")
 def index():
-    return {"status": "ok", "endpoints": ["/healthz", "/scrape-directory", "/debug-render", "/docs"]}
+    return {"status": "ok", "endpoints": [
+        "/healthz",
+        "/scrape-directory",
+        "/scrape-directory/json",
+        "/scrape-directory/crawl",
+        "/debug-render",
+        "/docs",
+    ]}
 
 @app.get("/debug-render")
 def debug_render(url: str, wait_ms: int = 2500):
@@ -46,3 +55,31 @@ def scrape_directory_endpoint(payload: ScrapeRequest):
         wait_ms=payload.wait_ms,
     )
     return {"count": len(domains), "mode": mode, "top_raw_hosts": top_hosts, "domains": domains}
+
+
+class JsonScrapeRequest(BaseModel):
+    url: str
+
+
+@app.post("/scrape-directory/json")
+def scrape_directory_json_endpoint(payload: JsonScrapeRequest):
+    try:
+        records = fetch_experts_json(payload.url)
+        domains = extract_domains(records)
+        return {"count": len(domains), "domains": domains}
+    except Exception as e:
+        return {"count": 0, "domains": [], "error": str(e)}
+
+
+class CrawlRequest(BaseModel):
+    url: str
+    limit_profiles: int = 100
+
+
+@app.post("/scrape-directory/crawl")
+def scrape_directory_crawl_endpoint(payload: CrawlRequest):
+    try:
+        domains = crawl_directory(payload.url, limit_profiles=payload.limit_profiles)
+        return {"count": len(domains), "domains": domains}
+    except Exception as e:
+        return {"count": 0, "domains": [], "error": str(e)}

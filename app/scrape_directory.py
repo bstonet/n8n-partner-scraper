@@ -8,6 +8,15 @@ from collections import Counter
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; MotivoScraper/1.0; +https://getmotivo.ai)"}
 
+ALLOWLIST = {
+    # Known expert partner domains to always allow (safety valve)
+    "makeitfuture.com","agoodspeed.com","aoe.com","atheo.com","agenix.ai","agent.studio",
+    "alexandraspalato.com","avanai.com","bitovi.com","cloudvox.it","data4prime.it",
+    "datafix.nl","digitalcube.ai","dotsandarrows.io","ed.agency","exxeta.com",
+    "makeautomation.co","molia.com","octionic.com","pulpsense.com","symplytics.ai",
+    "truehorizon.ai","wotai.ai",
+}
+
 BLOCKLIST = {
     "experts.n8n.io","n8n.io","n8n.cloud","vercel.app","cloudflare.com","gstatic.com",
     "x.com","twitter.com","linkedin.com","facebook.com","instagram.com","youtube.com",
@@ -21,7 +30,11 @@ BLOCKLIST = {
     "google.com","webflow.com","shopify.com","typeform.com","airtable.com",
     "notion.so","notion.site","slack.com","zapier.com","make.com","workato.com",
     "segment.com","hubspot.com","salesforce.com",
-    "flickr.com","dropbox.com","drive.google.com","box.com"
+    "flickr.com","dropbox.com","drive.google.com","box.com",
+    # Additional platform/infra/common CDNs
+    "cdn.partnerpage.io","js.partnerpage.io","assets.partnerpage.io","content.partnerpage.io",
+    "admin.partnerpage.io","mixpanel.com","sentry.io","fontawesome.com","gstatic.com",
+    "fonts.googleapis.com","fonts.gstatic.com"
 }
 
 def _host(url_or_host: str) -> Optional[str]:
@@ -37,6 +50,7 @@ def _norm_to_domain(url_or_host: str) -> Optional[str]:
     ext = tldextract.extract(h)
     if not ext.domain or not ext.suffix: return None
     domain = f"{ext.domain}.{ext.suffix}"
+    if domain in ALLOWLIST: return domain
     if domain in BLOCKLIST: return None
     return domain
 
