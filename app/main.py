@@ -13,6 +13,10 @@ class ScrapeRequest(BaseModel):
     use_js: bool = False
     wait_ms: int = 2000
 
+@app.get("/")
+def index():
+    return {"status": "ok", "endpoints": ["/healthz", "/scrape-directory", "/docs"]}
+
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
@@ -25,7 +29,7 @@ def scrape_directory_endpoint(payload: ScrapeRequest):
     if not urls:
         return {"count": 0, "domains": [], "note": "Provide 'url' or 'urls'."}
 
-    domains, mode, raw_len = scrape_directory(
+    domains, mode, top_hosts = scrape_directory(
         urls=urls,
         use_js=payload.use_js,
         renderer=render_html_sync if payload.use_js else None,
@@ -35,6 +39,6 @@ def scrape_directory_endpoint(payload: ScrapeRequest):
     return {
         "count": len(domains),
         "mode": mode,
-        "raw_links_seen": raw_len,
+        "top_raw_hosts": top_hosts,
         "domains": domains
     }
