@@ -25,11 +25,16 @@ def scrape_directory_endpoint(payload: ScrapeRequest):
     if not urls:
         return {"count": 0, "domains": [], "note": "Provide 'url' or 'urls'."}
 
-    domains = scrape_directory(
+    domains, mode, raw_len = scrape_directory(
         urls=urls,
         use_js=payload.use_js,
         renderer=render_html_sync if payload.use_js else None,
         renderer_hrefs=render_collect_hrefs_sync if payload.use_js else None,
         wait_ms=payload.wait_ms,
     )
-    return {"count": len(domains), "domains": domains}
+    return {
+        "count": len(domains),
+        "mode": mode,
+        "raw_links_seen": raw_len,
+        "domains": domains
+    }
