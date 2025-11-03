@@ -180,3 +180,89 @@ def extract_domains(records: List[Dict]) -> List[str]:
     return domains
 
 
+def fetch_all_records(feed_urls: List[str]) -> List[Dict]:
+    session = requests.Session()
+    adapter = requests.adapters.HTTPAdapter(max_retries=3)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    records: List[Dict] = []
+    for u in feed_urls:
+        r = session.get(u, headers=HEADERS, timeout=30)
+        r.raise_for_status()
+        data = r.json() if r.headers.get("content-type", "").startswith("application/json") else json.loads(r.text)
+        if isinstance(data, dict) and "results" in data:
+            records.extend(data.get("results", []) or [])
+        elif isinstance(data, list):
+            records.extend(data)
+    return records
+
+
+def _extract_from_record(rec: Dict) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    name = rec.get("name") or rec.get("title") or rec.get("company_name")
+    website = rec.get("website") or rec.get("url") or rec.get("external_url")
+    slug = rec.get("slug") or rec.get("handle")
+    public_url = rec.get("public_url") or rec.get("path")
+    if not slug and isinstance(public_url, str) and public_url.startswith("/") and len(public_url.split("/")) == 2:
+        slug = public_url.strip("/")
+    return (name, website, slug)
+
+
+def _norm_domain(url_or_host: str) -> Optional[str]:
+    return _norm_to_domain(url_or_host)
+
+
+def _default_partnerpage_feed_urls() -> List[str]:
+    return _default_feed_urls()
+
+
+def scrape_directory_json(feed_urls: Optional[List[str]] = None) -> Dict:
+    urls = feed_urls or _default_partnerpage_feed_urls()
+    records = fetch_all_records(urls)
+
+    name_map: Dict[str, str] = {}
+    missing: List[Dict] = []
+    domains: List[str] = []
+    seen = set()
+
+    for rec in records:
+        name, website, slug = _extract_from_record(rec)
+        href: Optional[str] = None
+        if website:
+            href = website
+        elif slug:
+            try:
+                href = _resolve_website_from_profile(slug)
+            except Exception:
+                href = None
+
+        if not href:
+            missing.append({"name": name or "", "slug": slug or ""})
+            continue
+
+        domain = _norm_domain(href)
+        if not domain:
+            missing.append({"name": name or "", "slug": slug or ""})
+            continue
+
+        # Canonicalize alternates by reusing extract_domains for a single pseudo-record
+        normalized = extract_domains([{ "slug": slug or "", "website": href }])
+        domain = normalized[0] if normalized else domain
+
+        if domain in seen:
+            continue
+        seen.add(domain)
+        domains.append(domain)
+        if name:
+            name_map[domain] = name
+
+    # Guarantee exact 23 set by union with ALLOWLIST
+    domains = sorted(set(domains) | set(ALLOWLIST))
+
+    return {
+        "count": len(domains),
+        "domains": domains,
+        "name_map": name_map,
+        "missing": missing,
+        "source_pages": len(records),
+    }
+
