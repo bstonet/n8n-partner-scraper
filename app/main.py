@@ -115,3 +115,35 @@ def require_bearer(Authorization: Optional[str] = Header(None)):
 @app.post("/process")
 def process_endpoint(_=Depends(require_bearer)):
     return process_all()
+
+# --- CORS / readiness / version middleware & endpoints ---
+import os
+from fastapi.middleware.cors import CORSMiddleware
+
+def _parse_origins(env_val: str | None) -> list[str]:
+    if not env_val:
+        return []
+    parts = [p.strip() for p in env_val.replace(" ", ",").split(",") if p.strip()]
+    return parts
+
+ALLOWED_ORIGINS = _parse_origins(os.getenv("ALLOW_ORIGINS"))
+DEFAULTS = ["http://localhost:5678", "http://127.0.0.1:5678"]
+origins = ALLOWED_ORIGINS or DEFAULTS
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["Content-Type"],
+    max_age=86400,
+)
+
+@app.get("/readyz")
+def readyz():
+    return {"status": "ready"}
+
+@app.get("/version")
+def version():
+    return {"service": app.title, "version": os.getenv("APP_VERSION", "v1")}
